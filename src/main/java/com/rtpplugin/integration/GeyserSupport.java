@@ -3,6 +3,7 @@ package com.rtpplugin.integration;
 import com.rtpplugin.RTPPlugin;
 import org.bukkit.entity.Player;
 
+import java.lang.reflect.Method;
 import java.util.UUID;
 
 public class GeyserSupport {
@@ -23,9 +24,14 @@ public class GeyserSupport {
     }
 
     public boolean isBedrockPlayer(Player player) {
-        if (!floodgateAvailable) return false;
+        if (!floodgateAvailable) return isBedrockUUID(player.getUniqueId());
         try {
-            return org.geysermc.floodgate.api.FloodgateApi.getInstance().isFloodgatePlayer(player.getUniqueId());
+            // Use reflection to avoid hard compile-time dependency on Floodgate API
+            Class<?> floodgateApiClass = Class.forName("org.geysermc.floodgate.api.FloodgateApi");
+            Method getInstanceMethod = floodgateApiClass.getMethod("getInstance");
+            Object apiInstance = getInstanceMethod.invoke(null);
+            Method isFloodgateMethod = floodgateApiClass.getMethod("isFloodgatePlayer", UUID.class);
+            return (boolean) isFloodgateMethod.invoke(apiInstance, player.getUniqueId());
         } catch (Exception e) {
             // Fallback: check for Bedrock UUID prefix
             return isBedrockUUID(player.getUniqueId());

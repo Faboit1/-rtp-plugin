@@ -1,17 +1,20 @@
 package com.rtpplugin;
 
 import com.rtpplugin.commands.RTPCommand;
+import com.rtpplugin.commands.RTPQCommand;
 import com.rtpplugin.commands.RTPTabCompleter;
 import com.rtpplugin.config.ConfigManager;
 import com.rtpplugin.config.MessageManager;
 import com.rtpplugin.integration.EconomyManager;
 import com.rtpplugin.integration.GeyserSupport;
 import com.rtpplugin.listeners.CombatListener;
+import com.rtpplugin.listeners.GuiListener;
 import com.rtpplugin.listeners.MovementListener;
 import com.rtpplugin.location.LocationPreloader;
 import com.rtpplugin.manager.CooldownManager;
 import com.rtpplugin.manager.CombatTagManager;
 import com.rtpplugin.teleport.TeleportManager;
+import org.bukkit.command.PluginCommand;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.logging.Level;
@@ -58,12 +61,22 @@ public class RTPPlugin extends JavaPlugin {
 
         // Register commands
         RTPCommand rtpCommand = new RTPCommand(this);
-        getCommand("rtp").setExecutor(rtpCommand);
-        getCommand("rtp").setTabCompleter(new RTPTabCompleter(this));
+        PluginCommand rtpCmd = getCommand("rtp");
+        if (rtpCmd != null) {
+            rtpCmd.setExecutor(rtpCommand);
+            rtpCmd.setTabCompleter(new RTPTabCompleter(this));
+        }
+
+        RTPQCommand rtpqCommand = new RTPQCommand(this);
+        PluginCommand rtpqCmd = getCommand("rtpq");
+        if (rtpqCmd != null) {
+            rtpqCmd.setExecutor(rtpqCommand);
+        }
 
         // Register listeners
         getServer().getPluginManager().registerEvents(new CombatListener(this), this);
         getServer().getPluginManager().registerEvents(new MovementListener(this), this);
+        getServer().getPluginManager().registerEvents(new GuiListener(this), this);
 
         getLogger().info("RTPPlugin has been enabled!");
     }

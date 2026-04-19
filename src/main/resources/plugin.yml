@@ -11,6 +11,11 @@ commands:
     description: Random teleport command
     usage: /rtp [world] [player]
     permission: rtp.use
+  rtpq:
+    aliases: [rtpqueue]
+    description: RTP queue management GUI
+    usage: /rtpq
+    permission: rtp.admin
 
 permissions:
   rtp.use:

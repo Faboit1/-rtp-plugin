@@ -1,6 +1,7 @@
 package com.rtpplugin.config;
 
 import com.rtpplugin.RTPPlugin;
+import com.rtpplugin.util.SmallCapsUtil;
 import org.bukkit.ChatColor;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -25,11 +26,12 @@ public class MessageManager {
             plugin.saveResource("messages.yml", false);
         }
         messagesConfig = YamlConfiguration.loadConfiguration(file);
-        prefix = colorize(messagesConfig.getString("prefix", "&8[&5RTP&8] &7"));
+        prefix = colorize(SmallCapsUtil.convert(messagesConfig.getString("prefix", "&8[&5RTP&8] &7")));
     }
 
     public String getMessage(String key) {
-        return prefix + colorize(messagesConfig.getString(key, "Missing message: " + key));
+        String msg = messagesConfig.getString(key, "Missing message: " + key);
+        return prefix + colorize(SmallCapsUtil.convert(msg));
     }
 
     public String getMessage(String key, Map<String, String> placeholders) {
@@ -37,11 +39,12 @@ public class MessageManager {
         for (Map.Entry<String, String> entry : placeholders.entrySet()) {
             msg = msg.replace("{" + entry.getKey() + "}", entry.getValue());
         }
-        return prefix + colorize(msg);
+        return prefix + colorize(SmallCapsUtil.convert(msg));
     }
 
     public String getRawMessage(String key) {
-        return colorize(messagesConfig.getString(key, "Missing message: " + key));
+        String msg = messagesConfig.getString(key, "Missing message: " + key);
+        return colorize(SmallCapsUtil.convert(msg));
     }
 
     public String getRawMessage(String key, Map<String, String> placeholders) {
@@ -49,7 +52,7 @@ public class MessageManager {
         for (Map.Entry<String, String> entry : placeholders.entrySet()) {
             msg = msg.replace("{" + entry.getKey() + "}", entry.getValue());
         }
-        return colorize(msg);
+        return colorize(SmallCapsUtil.convert(msg));
     }
 
     public static String colorize(String message) {
