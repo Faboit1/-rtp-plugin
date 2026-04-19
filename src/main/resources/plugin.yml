@@ -1,0 +1,33 @@
+name: RTPPlugin
+version: ${project.version}
+main: com.rtpplugin.RTPPlugin
+api-version: '1.20'
+description: High-performance Random Teleport plugin
+softdepend: [Vault, Geyser-Spigot, floodgate]
+
+commands:
+  rtp:
+    aliases: [randomtp, wild, randomteleport]
+    description: Random teleport command
+    usage: /rtp [world] [player]
+    permission: rtp.use
+
+permissions:
+  rtp.use:
+    default: true
+  rtp.admin:
+    default: op
+  rtp.bypass.cooldown:
+    default: op
+  rtp.bypass.cost:
+    default: op
+  rtp.bypass.delay:
+    default: op
+  rtp.bypass.combat:
+    default: op
+  rtp.near:
+    default: op
+  rtp.others:
+    default: op
+  rtp.reload:
+    default: op
