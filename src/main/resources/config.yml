@@ -1,0 +1,175 @@
+# RTP Plugin Configuration
+general:
+  default-world: "world"
+  max-attempts: 30
+  debug: false
+
+# Per-world settings
+worlds:
+  world:
+    enabled: true
+    min-radius: 500
+    max-radius: 10000
+    center-x: 0
+    center-z: 0
+    use-world-border: true
+    shape: "circle"  # circle or square
+
+  world_nether:
+    enabled: true
+    min-radius: 100
+    max-radius: 3000
+    center-x: 0
+    center-z: 0
+    use-world-border: true
+    shape: "circle"
+
+  world_the_end:
+    enabled: false
+
+# Safety settings
+safety:
+  avoid-lava: true
+  avoid-water: true
+  avoid-void: true
+  min-y: 1
+  max-y: 320
+  safe-blocks:
+    - GRASS_BLOCK
+    - DIRT
+    - STONE
+    - SAND
+    - GRAVEL
+    - SNOW_BLOCK
+    - PODZOL
+    - MYCELIUM
+    - TERRACOTTA
+    - SANDSTONE
+    - RED_SAND
+    - RED_SANDSTONE
+    - DEEPSLATE
+    - CALCITE
+    - TUFF
+    - DRIPSTONE_BLOCK
+    - MOSS_BLOCK
+    - MUD
+    - PACKED_MUD
+  unsafe-blocks:
+    - LAVA
+    - FIRE
+    - CACTUS
+    - SWEET_BERRY_BUSH
+    - MAGMA_BLOCK
+    - CAMPFIRE
+    - SOUL_CAMPFIRE
+    - WITHER_ROSE
+    - POINTED_DRIPSTONE
+
+# Biome filtering
+biomes:
+  mode: "blacklist"  # blacklist or whitelist
+  blacklist:
+    - OCEAN
+    - DEEP_OCEAN
+    - WARM_OCEAN
+    - LUKEWARM_OCEAN
+    - COLD_OCEAN
+    - DEEP_LUKEWARM_OCEAN
+    - DEEP_COLD_OCEAN
+    - DEEP_FROZEN_OCEAN
+    - FROZEN_OCEAN
+    - RIVER
+    - FROZEN_RIVER
+  whitelist: []
+
+# Cooldown settings
+cooldown:
+  enabled: true
+  time: 300  # seconds
+  per-world: false
+
+# Warmup/delay
+warmup:
+  enabled: true
+  time: 5  # seconds
+  cancel-on-move: true
+  cancel-on-damage: true
+  move-threshold: 0.5
+
+# Economy (Vault)
+economy:
+  enabled: false
+  cost: 100.0
+  per-world-cost:
+    world: 100.0
+    world_nether: 200.0
+
+# Combat tag
+combat:
+  enabled: true
+  tag-duration: 15  # seconds
+
+# Effects
+effects:
+  particles:
+    enabled: true
+    type: "PORTAL"
+    count: 50
+  sound:
+    enabled: true
+    on-teleport: "ENTITY_ENDERMAN_TELEPORT"
+    on-warmup-start: "BLOCK_NOTE_BLOCK_PLING"
+    on-warmup-tick: "BLOCK_NOTE_BLOCK_HAT"
+    volume: 1.0
+    pitch: 1.0
+
+# UI settings
+ui:
+  bossbar:
+    enabled: true
+    color: "PURPLE"
+    style: "SOLID"
+    title: "&dTeleporting in &f{time}s&d..."
+  title:
+    enabled: true
+    fade-in: 5
+    stay: 20
+    fade-out: 5
+    main: "&5RTP"
+    subtitle: "&dTeleporting in &f{time}s&d..."
+  actionbar:
+    enabled: true
+    message: "&dRTP Warmup: &f{time}s &dremaining..."
+
+# Location preloading
+preload:
+  enabled: true
+  queue-size: 5
+  refill-interval: 60  # seconds
+  per-world: true
+
+# Permission-based radius
+permission-radius:
+  enabled: false
+  tiers:
+    vip:
+      permission: "rtp.radius.vip"
+      max-radius: 15000
+    mvp:
+      permission: "rtp.radius.mvp"
+      max-radius: 25000
+    elite:
+      permission: "rtp.radius.elite"
+      max-radius: 50000
+
+# RTP near player settings
+rtp-near:
+  enabled: true
+  min-distance: 100
+  max-distance: 500
+
+# Chunk preloading
+chunk-preload:
+  enabled: true
+  radius: 2  # chunks around target location
+  timeout: 10  # seconds
