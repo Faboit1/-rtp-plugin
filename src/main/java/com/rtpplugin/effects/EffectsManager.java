@@ -14,13 +14,35 @@ import java.util.concurrent.ThreadLocalRandom;
 public class EffectsManager {
 
     // Event-key constants used as config path segments under "effects.<event>"
-    public static final String DEPARTURE   = "departure";
-    public static final String ARRIVAL     = "arrival";
+    public static final String DEPARTURE    = "departure";
+    public static final String ARRIVAL      = "arrival";
     public static final String WARMUP_START = "warmup-start";
     public static final String WARMUP_TICK  = "warmup-tick";
     public static final String WARMUP_CANCEL = "warmup-cancel";
     public static final String DENIED       = "denied";
     public static final String NO_LOCATION  = "no-location";
+
+    private static final Map<String, Color> COLOR_MAP;
+    static {
+        COLOR_MAP = new java.util.HashMap<>();
+        COLOR_MAP.put("WHITE",   Color.WHITE);
+        COLOR_MAP.put("SILVER",  Color.SILVER);
+        COLOR_MAP.put("GRAY",    Color.GRAY);
+        COLOR_MAP.put("BLACK",   Color.BLACK);
+        COLOR_MAP.put("RED",     Color.RED);
+        COLOR_MAP.put("MAROON",  Color.MAROON);
+        COLOR_MAP.put("YELLOW",  Color.YELLOW);
+        COLOR_MAP.put("OLIVE",   Color.OLIVE);
+        COLOR_MAP.put("LIME",    Color.LIME);
+        COLOR_MAP.put("GREEN",   Color.GREEN);
+        COLOR_MAP.put("AQUA",    Color.AQUA);
+        COLOR_MAP.put("TEAL",    Color.TEAL);
+        COLOR_MAP.put("BLUE",    Color.BLUE);
+        COLOR_MAP.put("NAVY",    Color.NAVY);
+        COLOR_MAP.put("FUCHSIA", Color.FUCHSIA);
+        COLOR_MAP.put("PURPLE",  Color.PURPLE);
+        COLOR_MAP.put("ORANGE",  Color.ORANGE);
+    }
 
     private final RTPPlugin plugin;
     /** Players that currently have our warmup potion effects applied */
@@ -179,11 +201,9 @@ public class EffectsManager {
     private List<Color> parseColors(List<String> names) {
         List<Color> result = new ArrayList<>();
         for (String name : names) {
-            try {
-                java.lang.reflect.Field f = Color.class.getField(name.toUpperCase());
-                result.add((Color) f.get(null));
-            } catch (Exception ignored) {
-                // unknown color name — skip
+            Color color = COLOR_MAP.get(name.toUpperCase());
+            if (color != null) {
+                result.add(color);
             }
         }
         return result;

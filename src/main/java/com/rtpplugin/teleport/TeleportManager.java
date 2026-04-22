@@ -291,9 +291,10 @@ public class TeleportManager {
             case "nearby" -> {
                 int radius = plugin.getConfigManager().getAnnounceNearbyRadius();
                 if (player.getWorld() != null) {
+                    long radiusSquared = (long) radius * radius;
                     for (Player p : player.getWorld().getPlayers()) {
                         if (!p.equals(player)
-                                && p.getLocation().distanceSquared(to) <= (double) radius * radius
+                                && p.getLocation().distanceSquared(to) <= radiusSquared
                                 && (seePerm.isEmpty() || p.hasPermission(seePerm))) {
                             p.sendMessage(finalMsg);
                         }

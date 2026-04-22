@@ -67,8 +67,9 @@ public class LocationPreloader {
         int maxConcurrent = plugin.getConfigManager().getMaxConcurrentSearches();
 
         // Calculate exactly how many new searches to start, capped by maxConcurrent
-        int currentTotal = queue.size() + flight.get();
-        int needed = Math.min(maxSize - currentTotal, maxConcurrent - flight.get());
+        // Cap to maxConcurrent in-flight regardless of queue gap
+        int needed = maxSize - queue.size() - flight.get();
+        needed = Math.min(needed, maxConcurrent - flight.get());
         if (needed <= 0) return;
 
         World world = Bukkit.getWorld(worldName);
