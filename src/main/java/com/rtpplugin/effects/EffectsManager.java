@@ -1,62 +1,191 @@
 package com.rtpplugin.effects;
 
 import com.rtpplugin.RTPPlugin;
-import org.bukkit.Location;
-import org.bukkit.Particle;
-import org.bukkit.Sound;
+import org.bukkit.*;
+import org.bukkit.entity.Firework;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.meta.FireworkMeta;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
+
+import java.util.*;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class EffectsManager {
 
+    // Event-key constants used as config path segments under "effects.<event>"
+    public static final String DEPARTURE   = "departure";
+    public static final String ARRIVAL     = "arrival";
+    public static final String WARMUP_START = "warmup-start";
+    public static final String WARMUP_TICK  = "warmup-tick";
+    public static final String WARMUP_CANCEL = "warmup-cancel";
+    public static final String DENIED       = "denied";
+    public static final String NO_LOCATION  = "no-location";
+
     private final RTPPlugin plugin;
+    /** Players that currently have our warmup potion effects applied */
+    private final Set<UUID> warmupEffectPlayers = Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<UUID, Boolean>());
 
     public EffectsManager(RTPPlugin plugin) {
         this.plugin = plugin;
     }
 
-    public void playTeleportEffects(Player player, Location from, Location to) {
-        if (plugin.getConfigManager().isParticlesEnabled()) {
-            spawnParticles(player, from);
-            spawnParticles(player, to);
+    // ── Public API ────────────────────────────────────────────────────────────
+
+    /** Called when the teleport executes (player disappears from their old spot). */
+    public void playDepartureEffects(Player player) {
+        playParticleEffect(player, player.getLocation(), DEPARTURE);
+        playSoundEffect(player, DEPARTURE);
+    }
+
+    /** Called after the player has arrived at the destination. */
+    public void playArrivalEffects(Player player, Location to) {
+        playParticleEffect(player, to, ARRIVAL);
+        playSoundEffect(player, ARRIVAL);
+
+        if (plugin.getConfigManager().isArrivalFakeLightningEnabled()) {
+            to.getWorld().strikeLightningEffect(to);
         }
-        if (plugin.getConfigManager().isSoundEnabled()) {
-            playSound(player, plugin.getConfigManager().getTeleportSound());
+        if (plugin.getConfigManager().isArrivalFireworkEnabled()) {
+            launchFirework(to);
         }
     }
 
+    /** Called when the warmup countdown starts. */
     public void playWarmupStartEffects(Player player) {
-        if (plugin.getConfigManager().isSoundEnabled()) {
-            playSound(player, plugin.getConfigManager().getWarmupStartSound());
-        }
+        playParticleEffect(player, player.getLocation(), WARMUP_START);
+        playSoundEffect(player, WARMUP_START);
+        applyWarmupPotionEffects(player);
     }
 
+    /** Called every second during the warmup countdown. */
     public void playWarmupTickEffects(Player player) {
-        if (plugin.getConfigManager().isSoundEnabled()) {
-            playSound(player, plugin.getConfigManager().getWarmupTickSound());
+        playParticleEffect(player, player.getLocation(), WARMUP_TICK);
+        playSoundEffect(player, WARMUP_TICK);
+    }
+
+    /** Called when the warmup is cancelled (move / damage / command). */
+    public void playWarmupCancelEffects(Player player) {
+        playParticleEffect(player, player.getLocation(), WARMUP_CANCEL);
+        playSoundEffect(player, WARMUP_CANCEL);
+        removeWarmupPotionEffects(player);
+    }
+
+    /** Called when the player is denied by cooldown / combat / economy / permission. */
+    public void playDeniedEffects(Player player) {
+        playSoundEffect(player, DENIED);
+    }
+
+    /** Called when no safe location could be found. */
+    public void playNoLocationEffects(Player player) {
+        playSoundEffect(player, NO_LOCATION);
+    }
+
+    // ── Potion effects ────────────────────────────────────────────────────────
+
+    public void applyWarmupPotionEffects(Player player) {
+        if (!plugin.getConfigManager().isWarmupPotionEffectsEnabled()) return;
+        int warmupTicks = plugin.getConfigManager().getWarmupTime() * 20 + 20;
+
+        if (plugin.getConfigManager().isWarmupSlownessEnabled()) {
+            int level = Math.max(1, plugin.getConfigManager().getWarmupSlownessLevel()) - 1;
+            player.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, warmupTicks, level, false, true, true));
         }
-        if (plugin.getConfigManager().isParticlesEnabled()) {
-            spawnParticles(player, player.getLocation());
+        if (plugin.getConfigManager().isWarmupBlindnessEnabled()) {
+            player.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, warmupTicks, 0, false, true, true));
+        }
+        if (plugin.getConfigManager().isWarmupGlowingEnabled()) {
+            player.addPotionEffect(new PotionEffect(PotionEffectType.GLOWING, warmupTicks, 0, false, false, false));
+        }
+        warmupEffectPlayers.add(player.getUniqueId());
+    }
+
+    public void removeWarmupPotionEffects(Player player) {
+        if (!warmupEffectPlayers.remove(player.getUniqueId())) return;
+        if (plugin.getConfigManager().isWarmupSlownessEnabled()) {
+            player.removePotionEffect(PotionEffectType.SLOWNESS);
+        }
+        if (plugin.getConfigManager().isWarmupBlindnessEnabled()) {
+            player.removePotionEffect(PotionEffectType.BLINDNESS);
+        }
+        if (plugin.getConfigManager().isWarmupGlowingEnabled()) {
+            player.removePotionEffect(PotionEffectType.GLOWING);
         }
     }
 
-    private void spawnParticles(Player player, Location location) {
+    // ── Private helpers ───────────────────────────────────────────────────────
+
+    private void playParticleEffect(Player player, Location location, String event) {
+        if (!plugin.getConfigManager().isEffectParticleEnabled(event)) return;
         try {
-            Particle particle = Particle.valueOf(plugin.getConfigManager().getParticleType());
-            int count = plugin.getConfigManager().getParticleCount();
-            player.getWorld().spawnParticle(particle, location, count, 0.5, 1.0, 0.5, 0.1);
+            Particle particle = Particle.valueOf(plugin.getConfigManager().getEffectParticleType(event));
+            int count = plugin.getConfigManager().getEffectParticleCount(event);
+            double sx = plugin.getConfigManager().getEffectParticleSpreadX(event);
+            double sy = plugin.getConfigManager().getEffectParticleSpreadY(event);
+            double sz = plugin.getConfigManager().getEffectParticleSpreadZ(event);
+            double speed = plugin.getConfigManager().getEffectParticleSpeed(event);
+            player.getWorld().spawnParticle(particle, location, count, sx, sy, sz, speed);
         } catch (IllegalArgumentException e) {
-            plugin.getLogger().warning("Invalid particle type: " + plugin.getConfigManager().getParticleType());
+            plugin.getLogger().warning("Invalid particle type for effect '" + event + "': "
+                    + plugin.getConfigManager().getEffectParticleType(event));
         }
     }
 
-    private void playSound(Player player, String soundName) {
+    private void playSoundEffect(Player player, String event) {
+        if (!plugin.getConfigManager().isEffectSoundEnabled(event)) return;
+        String soundName = plugin.getConfigManager().getEffectSoundName(event);
         try {
             Sound sound = Sound.valueOf(soundName);
-            float volume = plugin.getConfigManager().getSoundVolume();
-            float pitch = plugin.getConfigManager().getSoundPitch();
+            float volume = plugin.getConfigManager().getEffectSoundVolume(event);
+            float pitch  = plugin.getConfigManager().getEffectSoundPitch(event);
+            float variation = plugin.getConfigManager().getEffectSoundPitchVariation(event);
+            if (variation > 0f) {
+                pitch += (float) (ThreadLocalRandom.current().nextDouble(-variation, variation));
+                pitch = Math.max(0.1f, Math.min(2.0f, pitch));
+            }
             player.playSound(player.getLocation(), sound, volume, pitch);
         } catch (IllegalArgumentException e) {
-            plugin.getLogger().warning("Invalid sound: " + soundName);
+            plugin.getLogger().warning("Invalid sound for effect '" + event + "': " + soundName);
         }
+    }
+
+    private void launchFirework(Location location) {
+        try {
+            Firework fw = location.getWorld().spawn(location, Firework.class);
+            FireworkMeta meta = fw.getFireworkMeta();
+
+            FireworkEffect.Type type = FireworkEffect.Type.valueOf(
+                    plugin.getConfigManager().getArrivalFireworkType());
+
+            List<Color> colors = parseColors(plugin.getConfigManager().getArrivalFireworkColors());
+            List<Color> fades  = parseColors(plugin.getConfigManager().getArrivalFireworkFadeColors());
+
+            FireworkEffect effect = FireworkEffect.builder()
+                    .with(type)
+                    .withColor(colors.isEmpty() ? List.of(Color.PURPLE) : colors)
+                    .withFade(fades.isEmpty() ? List.of(Color.WHITE) : fades)
+                    .trail(plugin.getConfigManager().isArrivalFireworkTrail())
+                    .flicker(plugin.getConfigManager().isArrivalFireworkFlicker())
+                    .build();
+
+            meta.addEffect(effect);
+            meta.setPower(1);
+            fw.setFireworkMeta(meta);
+        } catch (IllegalArgumentException e) {
+            plugin.getLogger().warning("Invalid firework type: " + plugin.getConfigManager().getArrivalFireworkType());
+        }
+    }
+
+    private List<Color> parseColors(List<String> names) {
+        List<Color> result = new ArrayList<>();
+        for (String name : names) {
+            try {
+                java.lang.reflect.Field f = Color.class.getField(name.toUpperCase());
+                result.add((Color) f.get(null));
+            } catch (Exception ignored) {
+                // unknown color name — skip
+            }
+        }
+        return result;
     }
 }

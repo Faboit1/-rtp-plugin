@@ -26,7 +26,11 @@ public class CooldownManager {
         Long lastUse = cooldowns.get(key);
         if (lastUse == null) return false;
         long elapsed = (System.currentTimeMillis() - lastUse) / 1000;
-        return elapsed < plugin.getConfigManager().getCooldownTime();
+        if (elapsed >= plugin.getConfigManager().getCooldownTime()) {
+            cooldowns.remove(key);
+            return false;
+        }
+        return true;
     }
 
     public int getRemainingCooldown(UUID playerId, String world) {
@@ -47,5 +51,15 @@ public class CooldownManager {
 
     public void clearCooldown(UUID playerId) {
         cooldowns.entrySet().removeIf(entry -> entry.getKey().startsWith(playerId.toString()));
+    }
+
+    /**
+     * Remove all expired cooldown entries to prevent unbounded memory growth.
+     * Called periodically by the plugin's maintenance task.
+     */
+    public void cleanup() {
+        long cooldownMillis = plugin.getConfigManager().getCooldownTime() * 1000L;
+        long now = System.currentTimeMillis();
+        cooldowns.entrySet().removeIf(entry -> (now - entry.getValue()) >= cooldownMillis);
     }
 }

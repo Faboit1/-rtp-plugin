@@ -9,12 +9,19 @@ import org.bukkit.scheduler.BukkitTask;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class LocationPreloader {
 
     private final RTPPlugin plugin;
     private final LocationFinder finder;
     private final Map<String, Queue<Location>> queues = new ConcurrentHashMap<>();
+    /**
+     * Tracks how many async find-location futures are currently in-flight per world.
+     * This prevents the refill loop from spawning unlimited concurrent futures,
+     * which was the root cause of the memory leak / server timeout issue.
+     */
+    private final Map<String, AtomicInteger> inFlight = new ConcurrentHashMap<>();
     private BukkitTask refillTask;
 
     public LocationPreloader(RTPPlugin plugin) {
@@ -23,16 +30,14 @@ public class LocationPreloader {
     }
 
     public void start() {
-        // Initialize queues for enabled worlds
         for (String worldName : plugin.getConfigManager().getEnabledWorlds()) {
             queues.putIfAbsent(worldName, new ConcurrentLinkedQueue<>());
+            inFlight.putIfAbsent(worldName, new AtomicInteger(0));
         }
 
-        // Initial fill
         refillAll();
 
-        // Schedule periodic refill
-        int interval = plugin.getConfigManager().getPreloadRefillInterval() * 20; // Convert to ticks
+        int interval = plugin.getConfigManager().getPreloadRefillInterval() * 20;
         refillTask = Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, this::refillAll, interval, interval);
 
         plugin.getLogger().info("Location preloader started!");
@@ -43,7 +48,9 @@ public class LocationPreloader {
             refillTask.cancel();
             refillTask = null;
         }
+        finder.shutdown();
         queues.clear();
+        inFlight.clear();
     }
 
     public void refillAll() {
@@ -54,20 +61,30 @@ public class LocationPreloader {
 
     public void refillWorld(String worldName) {
         Queue<Location> queue = queues.computeIfAbsent(worldName, k -> new ConcurrentLinkedQueue<>());
-        int maxSize = plugin.getConfigManager().getPreloadQueueSize();
+        AtomicInteger flight = inFlight.computeIfAbsent(worldName, k -> new AtomicInteger(0));
 
-        while (queue.size() < maxSize) {
-            World world = Bukkit.getWorld(worldName);
-            if (world == null) break;
+        int maxSize = plugin.getConfigManager().getPreloadQueueSize(worldName);
+        int maxConcurrent = plugin.getConfigManager().getMaxConcurrentSearches();
 
-            int centerX = plugin.getConfigManager().getCenterX(worldName);
-            int centerZ = plugin.getConfigManager().getCenterZ(worldName);
-            int minRadius = plugin.getConfigManager().getMinRadius(worldName);
-            int maxRadius = plugin.getConfigManager().getMaxRadius(worldName);
-            String shape = plugin.getConfigManager().getShape(worldName);
+        // Calculate exactly how many new searches to start, capped by maxConcurrent
+        int currentTotal = queue.size() + flight.get();
+        int needed = Math.min(maxSize - currentTotal, maxConcurrent - flight.get());
+        if (needed <= 0) return;
 
+        World world = Bukkit.getWorld(worldName);
+        if (world == null) return;
+
+        int centerX = plugin.getConfigManager().getCenterX(worldName);
+        int centerZ = plugin.getConfigManager().getCenterZ(worldName);
+        int minRadius = plugin.getConfigManager().getMinRadius(worldName);
+        int maxRadius = plugin.getConfigManager().getMaxRadius(worldName);
+        String shape = plugin.getConfigManager().getShape(worldName);
+
+        for (int i = 0; i < needed; i++) {
+            flight.incrementAndGet();
             finder.findLocation(world, centerX, centerZ, minRadius, maxRadius, shape)
-                    .thenAccept(location -> {
+                    .whenComplete((location, ex) -> {
+                        flight.decrementAndGet();
                         if (location != null && queue.size() < maxSize) {
                             queue.offer(location);
                             plugin.debug("Preloaded location for " + worldName + ": " + location);
@@ -81,7 +98,8 @@ public class LocationPreloader {
         if (queue == null) return null;
         Location location = queue.poll();
         // Trigger refill if getting low
-        if (queue.size() < plugin.getConfigManager().getPreloadQueueSize() / 2) {
+        int maxSize = plugin.getConfigManager().getPreloadQueueSize(worldName);
+        if (queue.size() < maxSize / 2) {
             Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> refillWorld(worldName));
         }
         return location;

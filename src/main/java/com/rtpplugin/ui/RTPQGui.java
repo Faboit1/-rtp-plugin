@@ -42,7 +42,7 @@ public class RTPQGui {
             String worldName = entry.getKey();
             Queue<Location> queue = entry.getValue();
             int queueSize = queue.size();
-            int maxSize = plugin.getConfigManager().getPreloadQueueSize();
+            int maxSize = plugin.getConfigManager().getPreloadQueueSize(worldName);
 
             Material mat = getWorldMaterial(worldName);
 
