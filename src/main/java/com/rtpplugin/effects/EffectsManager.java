@@ -111,7 +111,7 @@ public class EffectsManager {
 
         if (plugin.getConfigManager().isWarmupSlownessEnabled()) {
             int level = Math.max(1, plugin.getConfigManager().getWarmupSlownessLevel()) - 1;
-            player.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, warmupTicks, level, false, true, true));
+            player.addPotionEffect(new PotionEffect(PotionEffectType.SLOW, warmupTicks, level, false, true, true));
         }
         if (plugin.getConfigManager().isWarmupBlindnessEnabled()) {
             player.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, warmupTicks, 0, false, true, true));
@@ -125,7 +125,7 @@ public class EffectsManager {
     public void removeWarmupPotionEffects(Player player) {
         if (!warmupEffectPlayers.remove(player.getUniqueId())) return;
         if (plugin.getConfigManager().isWarmupSlownessEnabled()) {
-            player.removePotionEffect(PotionEffectType.SLOWNESS);
+            player.removePotionEffect(PotionEffectType.SLOW);
         }
         if (plugin.getConfigManager().isWarmupBlindnessEnabled()) {
             player.removePotionEffect(PotionEffectType.BLINDNESS);
