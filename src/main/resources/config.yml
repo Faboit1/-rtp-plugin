@@ -4,6 +4,14 @@ general:
   max-attempts: 30
   debug: false
 
+# Performance & memory tuning
+performance:
+  # Maximum concurrent async location-searches per world.
+  # Keeping this low prevents thread-pool saturation (memory leak).
+  max-concurrent-searches: 2
+  # Size of the dedicated thread pool used for location finding.
+  location-finder-threads: 2
+
 # Per-world settings
 worlds:
   world:
@@ -14,6 +22,9 @@ worlds:
     center-z: 0
     use-world-border: true
     shape: "circle"  # circle or square
+    # Per-world overrides (leave out to use global defaults)
+    max-attempts: 30
+    preload-queue-size: 5
 
   world_nether:
     enabled: true
@@ -23,6 +34,8 @@ worlds:
     center-z: 0
     use-world-border: true
     shape: "circle"
+    max-attempts: 50
+    preload-queue-size: 3
 
   world_the_end:
     enabled: false
@@ -87,6 +100,8 @@ cooldown:
   enabled: true
   time: 300  # seconds
   per-world: false
+  # Purge expired cooldown entries from memory every N minutes (0 = disable)
+  cleanup-interval-minutes: 10
 
 # Warmup/delay
 warmup:
@@ -94,7 +109,18 @@ warmup:
   time: 5  # seconds
   cancel-on-move: true
   cancel-on-damage: true
+  cancel-on-command: false  # cancel warmup if player runs any command
   move-threshold: 0.5
+  # Apply potion effects to the player during the warmup countdown
+  potion-effects:
+    enabled: true
+    slowness:
+      enabled: true
+      level: 2        # amplifier (1 = Slowness I, 2 = Slowness II, etc.)
+    blindness:
+      enabled: false
+    glowing:
+      enabled: true   # player glows during warmup (visible to others)
 
 # Economy (Vault)
 economy:
@@ -108,27 +134,136 @@ economy:
 combat:
   enabled: true
   tag-duration: 15  # seconds
+  # Purge expired combat tags from memory every N minutes (0 = disable)
+  cleanup-interval-minutes: 5
 
-# Effects
+# ────────────────────────────────────────────────
+# EFFECTS – fully per-event configurable
+# ────────────────────────────────────────────────
 effects:
-  particles:
-    enabled: true
-    type: "PORTAL"
-    count: 50
-  sound:
-    enabled: true
-    on-teleport: "ENTITY_ENDERMAN_TELEPORT"
-    on-warmup-start: "BLOCK_NOTE_BLOCK_PLING"
-    on-warmup-tick: "BLOCK_NOTE_BLOCK_HAT"
-    volume: 1.0
-    pitch: 1.0
+
+  # Played at the player's original location the moment they vanish
+  departure:
+    particles:
+      enabled: true
+      type: "PORTAL"          # any Particle enum name
+      count: 75
+      spread-x: 0.5           # random spread on each axis
+      spread-y: 1.0
+      spread-z: 0.5
+      speed: 0.1
+    sound:
+      enabled: true
+      name: "ENTITY_ENDERMAN_TELEPORT"
+      volume: 1.0
+      pitch: 1.0
+      pitch-variation: 0.0    # ±random variation added to pitch (0 = fixed)
+
+  # Played at the destination after the player arrives
+  arrival:
+    particles:
+      enabled: true
+      type: "END_ROD"
+      count: 100
+      spread-x: 0.5
+      spread-y: 1.5
+      spread-z: 0.5
+      speed: 0.05
+    sound:
+      enabled: true
+      name: "ENTITY_PLAYER_LEVELUP"
+      volume: 1.0
+      pitch: 0.5
+      pitch-variation: 0.0
+    # Strike a (harmless) fake lightning bolt at the arrival spot
+    fake-lightning: false
+    # Launch a firework at the arrival spot
+    firework:
+      enabled: false
+      type: "BALL_LARGE"      # BALL, BALL_LARGE, STAR, BURST, CREEPER
+      colors:
+        - "PURPLE"
+        - "WHITE"
+      fade-colors:
+        - "BLUE"
+      trail: true
+      flicker: true
+
+  # Played when the warmup countdown begins
+  warmup-start:
+    particles:
+      enabled: true
+      type: "SPELL_WITCH"
+      count: 30
+      spread-x: 0.3
+      spread-y: 0.5
+      spread-z: 0.3
+      speed: 0.05
+    sound:
+      enabled: true
+      name: "BLOCK_NOTE_BLOCK_PLING"
+      volume: 1.0
+      pitch: 1.0
+      pitch-variation: 0.0
+
+  # Played every second during the warmup countdown
+  warmup-tick:
+    particles:
+      enabled: true
+      type: "ENCHANTMENT_TABLE"
+      count: 20
+      spread-x: 0.3
+      spread-y: 0.5
+      spread-z: 0.3
+      speed: 0.05
+    sound:
+      enabled: true
+      name: "BLOCK_NOTE_BLOCK_HAT"
+      volume: 0.5
+      pitch: 1.0
+      pitch-variation: 0.1   # slightly random pitch each tick for a cool sweep effect
+
+  # Played when warmup is cancelled (moved, took damage, etc.)
+  warmup-cancel:
+    particles:
+      enabled: true
+      type: "SMOKE_NORMAL"
+      count: 40
+      spread-x: 0.3
+      spread-y: 0.5
+      spread-z: 0.3
+      speed: 0.05
+    sound:
+      enabled: true
+      name: "BLOCK_NOTE_BLOCK_BASS"
+      volume: 1.0
+      pitch: 0.5
+      pitch-variation: 0.0
+
+  # Played when the player is denied (cooldown / combat / economy / no permission)
+  denied:
+    sound:
+      enabled: true
+      name: "ENTITY_VILLAGER_NO"
+      volume: 1.0
+      pitch: 1.0
+      pitch-variation: 0.0
+
+  # Played when no safe location could be found
+  no-location:
+    sound:
+      enabled: true
+      name: "ENTITY_VILLAGER_NO"
+      volume: 1.0
+      pitch: 0.8
+      pitch-variation: 0.0
 
 # UI settings
 ui:
   bossbar:
     enabled: true
-    color: "PURPLE"
-    style: "SOLID"
+    color: "PURPLE"   # WHITE, RED, YELLOW, GREEN, BLUE, PURPLE, PINK
+    style: "SOLID"    # SOLID, SEGMENTED_6, SEGMENTED_10, SEGMENTED_12, SEGMENTED_20
     title: "&dTeleporting in &f{time}s&d..."
   title:
     enabled: true
@@ -144,8 +279,8 @@ ui:
 # Location preloading
 preload:
   enabled: true
-  queue-size: 5
-  refill-interval: 60  # seconds
+  queue-size: 5             # global default (per-world override in worlds section)
+  refill-interval: 60       # seconds between refill checks
   per-world: true
 
 # Permission-based radius
@@ -171,5 +306,26 @@ rtp-near:
 # Chunk preloading
 chunk-preload:
   enabled: true
-  radius: 2  # chunks around target location
-  timeout: 10  # seconds
+  radius: 2     # chunks around target location to force-load
+  timeout: 10   # seconds
+
+# Announce teleport to other players
+announce:
+  enabled: false
+  mode: "world"          # world | server | nearby
+  nearby-radius: 100     # blocks (only used when mode=nearby)
+  message: "&6{player} &ehas been randomly teleported!"
+  # Require this permission for the announce to be seen (leave blank for everyone)
+  see-permission: ""
+
+# Daily use limits (resets at server midnight / daily-reset-hour)
+daily-limit:
+  enabled: false
+  limit: 5               # uses per day
+  daily-reset-hour: 0    # 0-23, hour (UTC) at which the counter resets
+  bypass-permission: "rtp.bypass.daily"
+
+# Teleport history (/rtp history)
+history:
+  enabled: true
+  max-entries: 10        # entries stored per player

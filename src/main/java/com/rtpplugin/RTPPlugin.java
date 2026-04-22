@@ -11,8 +11,10 @@ import com.rtpplugin.listeners.CombatListener;
 import com.rtpplugin.listeners.GuiListener;
 import com.rtpplugin.listeners.MovementListener;
 import com.rtpplugin.location.LocationPreloader;
-import com.rtpplugin.manager.CooldownManager;
 import com.rtpplugin.manager.CombatTagManager;
+import com.rtpplugin.manager.CooldownManager;
+import com.rtpplugin.manager.DailyLimitManager;
+import com.rtpplugin.manager.TeleportHistoryManager;
 import com.rtpplugin.teleport.TeleportManager;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -30,6 +32,8 @@ public class RTPPlugin extends JavaPlugin {
     private LocationPreloader locationPreloader;
     private EconomyManager economyManager;
     private GeyserSupport geyserSupport;
+    private DailyLimitManager dailyLimitManager;
+    private TeleportHistoryManager teleportHistoryManager;
 
     @Override
     public void onEnable() {
@@ -42,6 +46,8 @@ public class RTPPlugin extends JavaPlugin {
         // Initialize managers
         cooldownManager = new CooldownManager(this);
         combatTagManager = new CombatTagManager(this);
+        dailyLimitManager = new DailyLimitManager(this);
+        teleportHistoryManager = new TeleportHistoryManager(configManager.getHistoryMaxEntries());
         teleportManager = new TeleportManager(this);
 
         // Initialize economy
@@ -58,6 +64,9 @@ public class RTPPlugin extends JavaPlugin {
         if (configManager.isPreloadEnabled()) {
             locationPreloader.start();
         }
+
+        // Schedule periodic memory cleanup tasks
+        scheduleCleanupTasks();
 
         // Register commands
         RTPCommand rtpCommand = new RTPCommand(this);
@@ -88,6 +97,7 @@ public class RTPPlugin extends JavaPlugin {
         }
         if (teleportManager != null) {
             teleportManager.cancelAll();
+            teleportManager.getLocationFinder().shutdown();
         }
         getLogger().info("RTPPlugin has been disabled!");
     }
@@ -96,6 +106,11 @@ public class RTPPlugin extends JavaPlugin {
         configManager = new ConfigManager(this);
         messageManager = new MessageManager(this);
         cooldownManager = new CooldownManager(this);
+        dailyLimitManager.clearAll();
+        teleportHistoryManager = new TeleportHistoryManager(configManager.getHistoryMaxEntries());
+
+        // Reload location finder thread pool
+        teleportManager.reloadFinder();
 
         if (locationPreloader != null) {
             locationPreloader.stop();
@@ -110,6 +125,33 @@ public class RTPPlugin extends JavaPlugin {
         }
     }
 
+    /**
+     * Schedule periodic cleanup tasks to purge expired entries and prevent
+     * unbounded memory growth in the manager maps.
+     */
+    private void scheduleCleanupTasks() {
+        // Cooldown cleanup
+        int cooldownInterval = configManager.getCooldownCleanupIntervalMinutes();
+        if (cooldownInterval > 0) {
+            long ticks = cooldownInterval * 60L * 20L;
+            getServer().getScheduler().runTaskTimerAsynchronously(this,
+                    () -> cooldownManager.cleanup(), ticks, ticks);
+        }
+
+        // Combat tag cleanup
+        int combatInterval = configManager.getCombatCleanupIntervalMinutes();
+        if (combatInterval > 0) {
+            long ticks = combatInterval * 60L * 20L;
+            getServer().getScheduler().runTaskTimerAsynchronously(this,
+                    () -> combatTagManager.cleanup(), ticks, ticks);
+        }
+
+        // Daily limit cleanup (once per hour)
+        long hourTicks = 60L * 60L * 20L;
+        getServer().getScheduler().runTaskTimerAsynchronously(this,
+                () -> dailyLimitManager.cleanup(), hourTicks, hourTicks);
+    }
+
     public static RTPPlugin getInstance() { return instance; }
     public ConfigManager getConfigManager() { return configManager; }
     public MessageManager getMessageManager() { return messageManager; }
@@ -119,6 +161,8 @@ public class RTPPlugin extends JavaPlugin {
     public LocationPreloader getLocationPreloader() { return locationPreloader; }
     public EconomyManager getEconomyManager() { return economyManager; }
     public GeyserSupport getGeyserSupport() { return geyserSupport; }
+    public DailyLimitManager getDailyLimitManager() { return dailyLimitManager; }
+    public TeleportHistoryManager getTeleportHistoryManager() { return teleportHistoryManager; }
 
     public void debug(String message) {
         if (configManager.isDebug()) {

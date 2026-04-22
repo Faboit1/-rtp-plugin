@@ -40,6 +40,16 @@ public class CombatTagManager {
         return Math.max(0, remaining);
     }
 
+    /**
+     * Remove all expired combat tags to prevent unbounded memory growth.
+     * Called periodically by the plugin's maintenance task.
+     */
+    public void cleanup() {
+        long tagDurationMillis = plugin.getConfigManager().getCombatTagDuration() * 1000L;
+        long now = System.currentTimeMillis();
+        combatTags.entrySet().removeIf(entry -> (now - entry.getValue()) >= tagDurationMillis);
+    }
+
     public void untag(UUID playerId) {
         combatTags.remove(playerId);
     }

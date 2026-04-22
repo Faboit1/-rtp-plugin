@@ -1,8 +1,8 @@
 package com.rtpplugin.commands;
 
 import com.rtpplugin.RTPPlugin;
+import com.rtpplugin.manager.TeleportHistoryManager;
 import com.rtpplugin.ui.RTPGui;
-import com.rtpplugin.util.SmallCapsUtil;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.command.Command;
@@ -10,6 +10,7 @@ import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
+import java.util.List;
 import java.util.Map;
 
 public class RTPCommand implements CommandExecutor {
@@ -34,7 +35,7 @@ public class RTPCommand implements CommandExecutor {
             return true;
         }
 
-        // /rtp gui - open GUI
+        // /rtp (no args) or /rtp gui — open GUI
         if (args.length == 0 || (args.length == 1 && args[0].equalsIgnoreCase("gui"))) {
             rtpGui.open(player);
             return true;
@@ -48,6 +49,16 @@ public class RTPCommand implements CommandExecutor {
             }
             plugin.reload();
             player.sendMessage(plugin.getMessageManager().getMessage("reload"));
+            return true;
+        }
+
+        // /rtp history
+        if (args.length == 1 && args[0].equalsIgnoreCase("history")) {
+            if (!plugin.getConfigManager().isHistoryEnabled()) {
+                player.sendMessage(plugin.getMessageManager().getMessage("no-permission"));
+                return true;
+            }
+            showHistory(player);
             return true;
         }
 
@@ -74,7 +85,7 @@ public class RTPCommand implements CommandExecutor {
         // /rtp <world> [player]
         String worldName = args[0];
 
-        // Check if it's a player name being teleported by admin
+        // Check if a target player was specified (admin teleport)
         if (args.length >= 2) {
             if (!player.hasPermission("rtp.others")) {
                 player.sendMessage(plugin.getMessageManager().getMessage("no-permission"));
@@ -87,7 +98,6 @@ public class RTPCommand implements CommandExecutor {
                 return true;
             }
 
-            // Validate world
             World world = Bukkit.getWorld(worldName);
             if (world == null || !plugin.getConfigManager().isWorldEnabled(worldName)) {
                 player.sendMessage(plugin.getMessageManager().getMessage("world-disabled",
@@ -113,5 +123,29 @@ public class RTPCommand implements CommandExecutor {
 
         plugin.getTeleportManager().initiateRTP(player, worldName);
         return true;
+    }
+
+    private void showHistory(Player player) {
+        List<TeleportHistoryManager.HistoryEntry> entries =
+                plugin.getTeleportHistoryManager().getHistory(player.getUniqueId());
+
+        if (entries.isEmpty()) {
+            player.sendMessage(plugin.getMessageManager().getMessage("history-empty"));
+            return;
+        }
+
+        player.sendMessage(plugin.getMessageManager().getMessage("history-header"));
+        for (int i = 0; i < entries.size(); i++) {
+            TeleportHistoryManager.HistoryEntry entry = entries.get(i);
+            String worldName = entry.getLocation().getWorld() != null
+                    ? entry.getLocation().getWorld().getName() : "unknown";
+            player.sendMessage(plugin.getMessageManager().getMessage("history-entry",
+                    Map.of("index", String.valueOf(i + 1),
+                            "world", worldName,
+                            "x", String.valueOf(entry.getLocation().getBlockX()),
+                            "y", String.valueOf(entry.getLocation().getBlockY()),
+                            "z", String.valueOf(entry.getLocation().getBlockZ()),
+                            "time", entry.getTimestamp())));
+        }
     }
 }
